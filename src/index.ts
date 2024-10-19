@@ -1,6 +1,6 @@
 // src/index.ts
 import GitHubProvider, { GitHubProviderOptions } from './providers/githubProvider.js';
-import RecordManager, { RecordManagerOptions } from './core/recordManager.js';
+import ORM from './orm/ORM.js';
 
 async function main() {
   const options: GitHubProviderOptions = {
@@ -13,18 +13,20 @@ async function main() {
 
   const githubProvider = new GitHubProvider(options);
 
-  // Example: Create a folder
-  await githubProvider.createFolder('myFolder');
+  // Create an instance of the ORM
+  const orm = new ORM({ provider: githubProvider });
 
-  // Example: Create a file
-  await githubProvider.createFile('myFolder/myFile.txt', 'File content', 'Create a new file');
+  // Test creating a table (folder)
+  console.log('Testing createTable:');
+  await orm.createTable('testTable');
 
-  // Example: Get file content and sha
-  const { content, sha } = await githubProvider.getFile('myFolder/myFile.txt');
-  console.log('File content:', content);
+  // Test renaming (modifying) the table
+  console.log('Testing modifyTable:');
+  await orm.modifyTable('testTable', 'renamedTestTable');
 
-  // Example: Delete the file
-  await githubProvider.deleteFile('myFolder/myFile.txt', 'Delete the file');
+  // Test deleting the table (folder)
+  console.log('Testing deleteTable:');
+  await orm.deleteTable('renamedTestTable');
 }
 
 main().catch(console.error);

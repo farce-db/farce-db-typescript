@@ -66,6 +66,7 @@ class GitHubProvider {
   // Rename a folder (Table)
   async renameFolder(oldFolderPath: string, newFolderPath: string): Promise<void> {
     try {
+      // Check if the old folder exists
       const contents = await this.octokit.repos.getContent({
         owner: this.owner,
         repo: this.repo,
@@ -83,10 +84,10 @@ class GitHubProvider {
           // Delete the old file
           await this.deleteFile(filePath, `Delete '${file.name}' from '${oldFolderPath}' after moving`);
         }
-        // After moving the files, delete the old folder
-        await this.deleteFolder(oldFolderPath);
+
+        console.log(`All files moved. No need to explicitly delete empty folder '${oldFolderPath}'`);
       } else {
-        console.error(`No files found in folder '${oldFolderPath}'`);
+        console.error(`No files found in folder '${oldFolderPath}'. Skipping deletion.`);
       }
     } catch (error) {
       console.error(`Error renaming folder '${oldFolderPath}':`, error);
