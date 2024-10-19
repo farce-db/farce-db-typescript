@@ -1,8 +1,8 @@
+// src/index.ts
 import GitHubProvider, { GitHubProviderOptions } from './providers/githubProvider.js';
 import RecordManager, { RecordManagerOptions } from './core/recordManager.js';
 
 async function main() {
-  // Define options for GitHubProvider
   const options: GitHubProviderOptions = {
     token: process.env.GITHUB_TOKEN as string,
     owner: process.env.GITHUB_OWNER as string,
@@ -11,26 +11,20 @@ async function main() {
     committerEmail: process.env.GITHUB_EMAIL as string,
   };
 
-  // Create GitHubProvider
   const githubProvider = new GitHubProvider(options);
-  
-  // Define RecordManagerOptions
-  const recordManagerOptions: RecordManagerOptions = {
-    storageProvider: githubProvider,  // Pass the GitHubProvider as the storageProvider
-    folderId: 'main',  // Use 'main' as folderId
-    cacheSize: 50  // Optional: specify cache size
-  };
 
-  // Create RecordManager with options
-  const recordManager = new RecordManager(recordManagerOptions);
-  
-  // Create a test record
-  const record = { id: 'test-record', name: 'Test Record', data: 'Some test data' };
-  
-  // Add record via RecordManager
-  await recordManager.createRecord(record);
+  // Example: Create a folder
+  await githubProvider.createFolder('myFolder');
+
+  // Example: Create a file
+  await githubProvider.createFile('myFolder/myFile.txt', 'File content', 'Create a new file');
+
+  // Example: Get file content and sha
+  const { content, sha } = await githubProvider.getFile('myFolder/myFile.txt');
+  console.log('File content:', content);
+
+  // Example: Delete the file
+  await githubProvider.deleteFile('myFolder/myFile.txt', 'Delete the file');
 }
 
-// Execute the main function and catch any errors
 main().catch(console.error);
-
