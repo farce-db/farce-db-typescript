@@ -206,9 +206,46 @@ class GitHubProvider {
       throw error;
     }
   }
+
+  // Get folder contents (for table contents)
+  async getFolderContents(folderPath: string): Promise<Array<{ path: string; name: string }>> {
+    try {
+      const { data } = await this.octokit.repos.getContent({
+        owner: this.owner,
+        repo: this.repo,
+        path: folderPath,
+      });
+
+      if (Array.isArray(data)) {
+        return data.map((item) => ({ path: item.path, name: item.name }));
+      } else {
+        throw new Error(`No contents found for folder '${folderPath}'`);
+      }
+    } catch (error) {
+      console.error(`Error fetching folder contents for '${folderPath}':`, error);
+      throw error;
+    }
+  }
+
+  // Get repo contents (for clearing the repo)
+  async getRepoContents(): Promise<Array<{ path: string; name: string; type: string }>> {
+    try {
+      const { data } = await this.octokit.repos.getContent({
+        owner: this.owner,
+        repo: this.repo,
+        path: '',  // Empty path fetches repo root
+      });
+
+      if (Array.isArray(data)) {
+        return data.map((item) => ({ path: item.path, name: item.name, type: item.type }));
+      } else {
+        throw new Error('No contents found in repository.');
+      }
+    } catch (error) {
+      console.error(`Error fetching repository contents:`, error);
+      throw error;
+    }
+  }
 }
 
 export default GitHubProvider;
-
-
-
