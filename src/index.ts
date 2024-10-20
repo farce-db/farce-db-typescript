@@ -1,51 +1,89 @@
-// src/index.ts
-import GitHubProvider, { GitHubProviderOptions } from './providers/githubProvider.js';
 import ORM from './orm/ORM.js';
+import GitHubProvider from './providers/githubProvider.js';
+import { TableSchema } from './types/Schema.js';
 
 async function main() {
-  // Define GitHubProvider options
-  const options: GitHubProviderOptions = {
+  const gitHubProvider = new GitHubProvider({
     token: process.env.GITHUB_TOKEN as string,
     owner: process.env.GITHUB_OWNER as string,
     repo: process.env.GITHUB_REPO as string,
     committerName: process.env.GITHUB_NAME as string,
     committerEmail: process.env.GITHUB_EMAIL as string,
+  });
+
+  const orm = new ORM({ provider: gitHubProvider });
+
+  const usersSchema: TableSchema = {
+    fields: {
+      name: 'string',
+      age: 'number',
+      email: 'string',
+    },
+    hashFields: ['name', 'email'], // Specify which fields to use for hashing
   };
 
-  // Initialize GitHubProvider and ORM
-  const githubProvider = new GitHubProvider(options);
-  const orm = new ORM({ provider: githubProvider });
+  orm.registerTableSchema('users', usersSchema);
 
-  // Test createTable function
-  console.log("Testing createTable:");
-  await orm.createTable('testTable'); // Creates the table (folder) 'testTable'
+  // Time utility function
+  async function measureTime(label: string, fn: () => Promise<void>) {
+    console.time(label);
+    await fn();
+    console.timeEnd(label);
+  }
 
-  // Test modifyTable function (rename the table)
-  console.log("Testing modifyTable:");
-  await orm.modifyTable('testTable', 'renamedTestTable'); // Renames 'testTable' to 'renamedTestTable'
+  try {
+    // 1. Create Table
+    await measureTime('Create Table', async () => {
+      await orm.createTable('users');
+    });
 
-  // Test deleteTable function
-  console.log("Testing deleteTable:");
-  await orm.deleteTable('renamedTestTable'); // Deletes the renamed table 'renamedTestTable'
+    // 2. Insert Records with hash-based filenames (No 'id' needed)
+    const record1 = { name: 'Alice Smith', age: 25, email: 'alice@example.com' };
+    const record2 = { name: 'Bob Johnson', age: 30, email: 'bob@example.com' };
+    const record3 = { name: 'Charlie Lee', age: 28, email: 'charlie@example.com' };
+    
+    await measureTime('Insert Record 1', async () => {
+      await orm.insertRecord('users', record1);
+    });
+    await measureTime('Insert Record 2', async () => {
+      await orm.insertRecord('users', record2);
+    });
+    await measureTime('Insert Record 3', async () => {
+      await orm.insertRecord('users', record3);
+    });
 
-  // Test deleteTableContents function (recreate and clear contents)
-  console.log("Testing deleteTableContents:");
-  await orm.createTable('testTableForContent');
-  await githubProvider.createFile('testTableForContent/file1.txt', 'File 1 content', 'Add file1');
-  await githubProvider.createFile('testTableForContent/file2.txt', 'File 2 content', 'Add file2');
-  console.log("Table contents before deletion:");
-  console.log(await githubProvider.getFolderContents('testTableForContent'));
-  await orm.deleteTableContents('testTableForContent'); // Deletes the contents of 'testTableForContent'
-  console.log("Table contents after deletion:");
-  console.log(await githubProvider.getFolderContents('testTableForContent'));
+    // 3. Retrieve a record by its hash
+    const hash = orm['generateHashFromFields']('users', record1); // Get the hash based on fields
+    await measureTime('Get Record by Hash', async () => {
+      const retrievedRecord = await orm.getRecordByHash('users', hash);
+      console.log('Retrieved Record:', retrievedRecord);
+    });
 
-  // Test clearRepo function (Note: Be careful, this will clear the entire repo)
-  console.log("Testing clearRepo:");
-  console.log("Repo contents before clearing:");
-  console.log(await githubProvider.getRepoContents());
-  await orm.clearRepo(); // Clears the entire repository
-  console.log("Repo contents after clearing:");
-  console.log(await githubProvider.getRepoContents());
+    // 4. Update a record by its hash
+    const updates = { age: 26 };
+    await measureTime('Update Record by Hash', async () => {
+      await orm.updateRecordByHash('users', hash, updates);
+    });
+
+    // 5. Get Updated Record
+    await measureTime('Get Updated Record', async () => {
+      const updatedRecord = await orm.getRecordByHash('users', hash);
+      console.log('Updated Record:', updatedRecord);
+    });
+
+    // 6. Delete Record by Hash
+    await measureTime('Delete Record by Hash', async () => {
+      await orm.deleteRecordByHash('users', hash);
+    });
+
+    // // 7. Clear Repository (this will delete everything in the repo)
+    // await measureTime('Clear Repository', async () => {
+    //   await orm.clearRepo();
+    // });
+
+  } catch (error) {
+    console.error('Error during testing:', error);
+  }
 }
 
 main().catch(console.error);
