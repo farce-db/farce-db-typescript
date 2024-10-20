@@ -25,6 +25,25 @@ class ORM {
   // Register a table schema
   registerTableSchema(tableName: string, schema: TableSchema): void {
     this.schemas[tableName] = schema;
+
+    // Create index files for the indexed fields
+    if (schema.indexFields) {
+      schema.indexFields.forEach(async (field) => {
+        const indexFilePath = `${tableName}/index_${field}.json`;
+        try {
+          await this.provider.createOrUpdateFile(
+            indexFilePath,
+            "{}",
+            `Create index for field '${field}'`
+          );
+          console.log(
+            `Index created for field '${field}' in table '${tableName}'.`
+          );
+        } catch (error) {
+          console.error(`Error creating index for field '${field}':`, error);
+        }
+      });
+    }
     console.log(`Schema for table '${tableName}' registered successfully.`);
   }
 
@@ -119,7 +138,7 @@ class ORM {
     return record;
   }
 
-  // Insert a record into a table, using a hash-based filename
+  // Insert a record into a table, and update indexes
   async insertRecord(tableName: string, record: any): Promise<void> {
     try {
       this.validateRecord(tableName, record); // Validate the record
@@ -135,7 +154,7 @@ class ORM {
       );
 
       // Create or update the file
-      await this.provider.createFile(
+      await this.provider.createOrUpdateFile(
         filePath,
         recordString,
         `Insert record with hash '${hash}'`
@@ -143,6 +162,40 @@ class ORM {
       console.log(
         `Record inserted into table '${tableName}' with hash '${hash}'.`
       );
+
+      // Update indexes
+      if (schema.indexFields) {
+        await Promise.all(
+          schema.indexFields.map(async (field) => {
+            const indexFilePath = `${tableName}/index_${field}.json`;
+
+            // Get the index file, or create it if it doesn't exist
+            let indexContent: string;
+            try {
+              indexContent = (await this.provider.getFile(indexFilePath))
+                .content;
+            } catch (error: any) {
+              if (error.status === 404) {
+                console.log(
+                  `Index file for '${field}' not found, creating a new one.`
+                );
+                indexContent = "{}"; // Empty index
+              } else {
+                throw error;
+              }
+            }
+
+            const index = JSON.parse(indexContent);
+            index[record[field]] = hash; // Map field value to hash
+
+            await this.provider.createOrUpdateFile(
+              indexFilePath,
+              JSON.stringify(index),
+              `Update index for field '${field}'`
+            );
+          })
+        );
+      }
     } catch (error) {
       console.error(`Error inserting record into table '${tableName}':`, error);
     }
@@ -163,6 +216,40 @@ class ORM {
     } catch (error) {
       console.error(
         `Error fetching record from table '${tableName}' with hash '${hash}':`,
+        error
+      );
+    }
+  }
+
+  // Get a record by an indexed field
+  async getRecordByField(
+    tableName: string,
+    field: string,
+    value: string
+  ): Promise<any> {
+    try {
+      const schema = this.schemas[tableName];
+
+      if (!schema.indexFields || !schema.indexFields.includes(field)) {
+        throw new Error(
+          `Field '${field}' is not indexed in table '${tableName}'.`
+        );
+      }
+
+      const indexFilePath = `${tableName}/index_${field}.json`;
+      const indexContent = await this.provider.getFile(indexFilePath);
+      const index = JSON.parse(indexContent.content);
+
+      const hash = index[value];
+      if (!hash) {
+        throw new Error(`No record found with ${field} = '${value}'`);
+      }
+
+      // Retrieve the record using the hash
+      return this.getRecordByHash(tableName, hash);
+    } catch (error) {
+      console.error(
+        `Error fetching record by field '${field}' in table '${tableName}':`,
         error
       );
     }
@@ -192,7 +279,7 @@ class ORM {
       );
 
       const filePath = `${tableName}/${hash}`;
-      await this.provider.createFile(
+      await this.provider.createOrUpdateFile(
         filePath,
         updatedRecordString,
         `Update record with hash '${hash}'`

@@ -1,7 +1,5 @@
 export interface TableSchema {
-    fields: {
-      [key: string]: 'string' | 'number' | 'boolean';
-    };
-    hashFields: string[]; // Array of field names to use for generating the hash
-  }
-  
+  fields: { [key: string]: string }; // field name and type
+  hashFields: string[]; // fields used for generating hash
+  indexFields?: string[]; // fields to be indexed
+}
